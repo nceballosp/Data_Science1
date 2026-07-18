@@ -3,352 +3,63 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# -------------------------------------------------
-# Configuración
-# -------------------------------------------------
-
-st.set_page_config(
-    page_title="Dashboard COVID Sintético",
-    page_icon="🦠",
-    layout="wide"
-)
-
-st.title("🦠 Dashboard Interactivo COVID-19")
-st.markdown("### Simulación de datos sintéticos (10.000 registros)")
-
-# -------------------------------------------------
-# Generación de datos
-# -------------------------------------------------
+st.set_page_config(page_title="Dashboard Gimnasio", page_icon="🏋️", layout="wide")
+if "ok" not in st.session_state: st.session_state.ok=False
+if not st.session_state.ok:
+    st.title("🏋️ Dashboard Gimnasio")
+    pwd=st.text_input("Contraseña",type="password")
+    if st.button("Ingresar"):
+        if pwd=="1234":
+            st.session_state.ok=True; st.rerun()
+        else: st.error("Contraseña incorrecta")
+    st.stop()
 
 @st.cache_data
-def generar_datos():
-
-    np.random.seed(123)
-
-    n = 10000
-
-    ciudades = [
-        "Bogotá",
-        "Medellín",
-        "Cali",
-        "Barranquilla",
-        "Cartagena",
-        "Bucaramanga"
-    ]
-
-    sexos = ["Masculino", "Femenino"]
-
-    estados = [
-        "Recuperado",
-        "Hospitalizado",
-        "Fallecido"
-    ]
-
-    vacunas = [
-        "Ninguna",
-        "1 Dosis",
-        "2 Dosis",
-        "Refuerzo"
-    ]
-
-    fechas = pd.date_range(
-        "2021-01-01",
-        "2023-12-31"
-    )
-
-    df = pd.DataFrame({
-
-        "Fecha": np.random.choice(fechas, n),
-
-        "Edad": np.random.randint(1,95,n),
-
-        "Ciudad": np.random.choice(ciudades,n),
-
-        "Sexo": np.random.choice(sexos,n),
-
-        "Estado": np.random.choice(
-            estados,
-            n,
-            p=[0.80,0.15,0.05]
-        ),
-
-        "Vacunación": np.random.choice(
-            vacunas,
-            n,
-            p=[0.15,0.20,0.35,0.30]
-        ),
-
-        "Días Hospitalizado": np.random.poisson(6,n),
-
-        "Costo Atención": np.random.normal(
-            3200,
-            900,
-            n
-        ).round(2)
-
+def data():
+    np.random.seed(1); n=10000
+    fechas=pd.date_range("2022-01-01","2025-12-31")
+    planes=["Básico","Premium","VIP"]; gen=["Masculino","Femenino"]
+    df=pd.DataFrame({
+      "Fecha_Registro":np.random.choice(fechas,n),
+      "Edad":np.random.randint(18,70,n),
+      "Género":np.random.choice(gen,n),
+      "Plan":np.random.choice(planes,n,p=[.5,.3,.2]),
+      "Visitas_Mes":np.random.randint(0,31,n),
+      "Gasto_Mensual":np.round(np.random.normal(120,25,n),2),
+      "Antigüedad_Meses":np.random.randint(1,61,n)
     })
-
-    df["Costo Atención"] = df["Costo Atención"].clip(300)
-
+    p=((df["Visitas_Mes"]<6)|(df["Antigüedad_Meses"]<4))
+    df["Churn"]=np.where(p,np.random.choice(["Abandonó","Activo"],n,p=[.65,.35]),
+                           np.random.choice(["Abandonó","Activo"],n,p=[.15,.85]))
     return df
-
-
-df = generar_datos()
-
-# -------------------------------------------------
-# Barra lateral
-# -------------------------------------------------
-
+df=data()
 st.sidebar.header("Filtros")
-
-ciudad = st.sidebar.multiselect(
-    "Ciudad",
-    df["Ciudad"].unique(),
-    default=df["Ciudad"].unique()
-)
-
-sexo = st.sidebar.multiselect(
-    "Sexo",
-    df["Sexo"].unique(),
-    default=df["Sexo"].unique()
-)
-
-estado = st.sidebar.multiselect(
-    "Estado",
-    df["Estado"].unique(),
-    default=df["Estado"].unique()
-)
-
-vacuna = st.sidebar.multiselect(
-    "Vacunación",
-    df["Vacunación"].unique(),
-    default=df["Vacunación"].unique()
-)
-
-df_filtrado = df[
-    (df["Ciudad"].isin(ciudad)) &
-    (df["Sexo"].isin(sexo)) &
-    (df["Estado"].isin(estado)) &
-    (df["Vacunación"].isin(vacuna))
-]
-
-# -------------------------------------------------
-# Métricas Cuantitativas
-# -------------------------------------------------
-
-st.header("📊 Métricas Cuantitativas")
-
-c1,c2,c3,c4 = st.columns(4)
-
-c1.metric(
-    "Total Casos",
-    len(df_filtrado)
-)
-
-c2.metric(
-    "Edad Promedio",
-    round(df_filtrado["Edad"].mean(),2)
-)
-
-c3.metric(
-    "Costo Promedio",
-    f"${df_filtrado['Costo Atención'].mean():,.0f}"
-)
-
-c4.metric(
-    "Hospitalización Prom.",
-    round(df_filtrado["Días Hospitalizado"].mean(),2)
-)
-
-# -------------------------------------------------
-# Estadística descriptiva
-# -------------------------------------------------
-
-st.subheader("Estadística Descriptiva")
-
-st.dataframe(
-    df_filtrado.describe()
-)
-
-# -------------------------------------------------
-# Estadística Cualitativa
-# -------------------------------------------------
-
-st.header("📌 Variables Cualitativas")
-
-col1,col2 = st.columns(2)
-
-with col1:
-
-    st.write("Estado")
-
-    tabla_estado = (
-        df_filtrado["Estado"]
-        .value_counts()
-        .reset_index()
-    )
-
-    tabla_estado.columns=["Estado","Frecuencia"]
-
-    st.dataframe(tabla_estado)
-
-with col2:
-
-    st.write("Ciudad")
-
-    tabla_ciudad = (
-        df_filtrado["Ciudad"]
-        .value_counts()
-        .reset_index()
-    )
-
-    tabla_ciudad.columns=["Ciudad","Frecuencia"]
-
-    st.dataframe(tabla_ciudad)
-
-# -------------------------------------------------
-# Variables elegidas por usuario
-# -------------------------------------------------
-
-st.header("📈 Construcción dinámica de gráficos")
-
-variables = df_filtrado.columns.tolist()
-
-x = st.selectbox(
-    "Variable eje X",
-    variables
-)
-
-y = st.selectbox(
-    "Variable eje Y",
-    variables,
-    index=1
-)
-
-tipo = st.selectbox(
-    "Tipo de gráfico",
-    [
-        "Dispersión",
-        "Barras",
-        "Caja",
-        "Histograma",
-        "Línea"
-    ]
-)
-
-if tipo=="Dispersión":
-
-    fig = px.scatter(
-        df_filtrado,
-        x=x,
-        y=y,
-        color="Estado"
-    )
-
-elif tipo=="Barras":
-
-    fig = px.bar(
-        df_filtrado,
-        x=x,
-        color="Estado"
-    )
-
-elif tipo=="Caja":
-
-    fig = px.box(
-        df_filtrado,
-        x=x,
-        y=y,
-        color="Estado"
-    )
-
-elif tipo=="Histograma":
-
-    fig = px.histogram(
-        df_filtrado,
-        x=x,
-        color="Estado"
-    )
-
-else:
-
-    fig = px.line(
-        df_filtrado.sort_values("Fecha"),
-        x=x,
-        y=y,
-        color="Estado"
-    )
-
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
-
-# -------------------------------------------------
-# Dashboard de análisis
-# -------------------------------------------------
-
-st.header("📊 Análisis Gráfico")
-
-g1,g2 = st.columns(2)
-
-with g1:
-
-    fig1 = px.histogram(
-        df_filtrado,
-        x="Edad",
-        nbins=30,
-        color="Estado",
-        title="Distribución de Edad"
-    )
-
-    st.plotly_chart(fig1,use_container_width=True)
-
-with g2:
-
-    fig2 = px.pie(
-        df_filtrado,
-        names="Estado",
-        title="Estado de Pacientes"
-    )
-
-    st.plotly_chart(fig2,use_container_width=True)
-
-g3,g4 = st.columns(2)
-
-with g3:
-
-    fig3 = px.box(
-        df_filtrado,
-        x="Estado",
-        y="Costo Atención",
-        color="Estado",
-        title="Costo por Estado"
-    )
-
-    st.plotly_chart(fig3,use_container_width=True)
-
-with g4:
-
-    fig4 = px.scatter(
-        df_filtrado,
-        x="Edad",
-        y="Costo Atención",
-        color="Estado",
-        size="Días Hospitalizado",
-        hover_data=["Ciudad"],
-        title="Edad vs Costo"
-    )
-
-    st.plotly_chart(fig4,use_container_width=True)
-
-# -------------------------------------------------
-# Tabla de datos
-# -------------------------------------------------
-
-st.header("Base de Datos")
-
-st.dataframe(
-    df_filtrado,
-    use_container_width=True
-)
+plan=st.sidebar.multiselect("Plan",df.Plan.unique(),default=list(df.Plan.unique()))
+gen=st.sidebar.multiselect("Género",df["Género"].unique(),default=list(df["Género"].unique()))
+ch=st.sidebar.multiselect("Churn",df.Churn.unique(),default=list(df.Churn.unique()))
+f=df[df.Plan.isin(plan)&df["Género"].isin(gen)&df.Churn.isin(ch)]
+tot=len(f); act=(f.Churn=="Activo").sum(); abd=(f.Churn=="Abandonó").sum(); tasa=abd/tot*100 if tot else 0
+c1,c2,c3,c4=st.columns(4)
+c1.metric("Clientes",tot); c2.metric("Activos",act); c3.metric("Abandonos",abd); c4.metric("Tasa",f"{tasa:.1f}%")
+c5,c6,c7=st.columns(3)
+c5.metric("Visitas Prom.",f"{f.Visitas_Mes.mean():.1f}")
+c6.metric("Ingreso Prom.",f"${f.Gasto_Mensual.mean():.2f}")
+c7.metric("Antigüedad",f"{f.Antigüedad_Meses.mean():.1f}")
+st.subheader("Estadística cuantitativa"); st.dataframe(f.describe())
+st.subheader("Frecuencia por Plan"); st.dataframe(f.Plan.value_counts())
+st.subheader("Frecuencia Churn"); st.dataframe(f.Churn.value_counts())
+x=st.selectbox("Eje X",f.columns)
+y=st.selectbox("Eje Y",[c for c in f.columns if c!=x])
+t=st.selectbox("Gráfico",["Dispersión","Barras","Histograma","Caja"])
+if t=="Dispersión": fig=px.scatter(f,x=x,y=y,color="Churn")
+elif t=="Barras": fig=px.bar(f,x=x,color="Churn")
+elif t=="Histograma": fig=px.histogram(f,x=x,color="Churn")
+else: fig=px.box(f,x=x,y=y,color="Churn")
+st.plotly_chart(fig,use_container_width=True)
+a,b=st.columns(2)
+with a: st.plotly_chart(px.pie(f,names="Churn",title="Churn"),use_container_width=True)
+with b: st.plotly_chart(px.histogram(f,x="Edad",color="Churn"),use_container_width=True)
+a,b=st.columns(2)
+with a: st.plotly_chart(px.scatter(f,x="Visitas_Mes",y="Gasto_Mensual",color="Churn",size="Antigüedad_Meses"),use_container_width=True)
+with b: st.plotly_chart(px.box(f,x="Plan",y="Gasto_Mensual",color="Plan"),use_container_width=True)
+st.subheader("Datos"); st.dataframe(f,use_container_width=True)
